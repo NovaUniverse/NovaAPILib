@@ -61,7 +61,7 @@ public class HTTPServer {
 	/**
 	 * Create and start a http server on the provided address
 	 * 
-	 * @param port The port number to use
+	 * @param address The port number to use
 	 * @throws IOException   If the address is invalid
 	 * @throws BindException If port is already in use
 	 */
