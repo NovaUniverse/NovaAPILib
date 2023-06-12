@@ -13,6 +13,10 @@ import net.novauniverse.apilib.http.enums.HTTPResponseCode;
 import net.novauniverse.apilib.http.enums.StandardResponseType;
 import net.novauniverse.apilib.http.exception.HTTPMethodNotSupportedException;
 import net.novauniverse.apilib.http.files.StaticFileHandler;
+import net.novauniverse.apilib.http.middleware.HTTPMiddleware;
+import net.novauniverse.apilib.http.middleware.MiddlewarePriority;
+import net.novauniverse.apilib.http.middleware.MiddlewareResponse;
+import net.novauniverse.apilib.http.middleware.MiddlewareType;
 import net.novauniverse.apilib.http.request.Request;
 import net.novauniverse.apilib.http.response.AbstractHTTPResponse;
 import net.novauniverse.apilib.http.response.JSONResponse;
@@ -27,6 +31,7 @@ import java.net.BindException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class HTTPServer {
 	public static final ExceptionMode DEFAULT_EXCEPTION_MODE = ExceptionMode.MESSAGE;
@@ -37,6 +42,7 @@ public class HTTPServer {
 	private boolean hasShutDown;
 	private StandardResponseType standardResponseType;
 	private ExceptionMode exceptionMode;
+	private List<HTTPMiddleware> middlewares;
 
 	public List<AuthenticationProvider> getAuthenticationProviders() {
 		return authenticationProviders;
@@ -49,7 +55,7 @@ public class HTTPServer {
 
 	/**
 	 * Create and start a http server on the provided port
-	 * 
+	 *
 	 * @param port The port number to use
 	 * @throws IOException   If the port number is invalid
 	 * @throws BindException If port is already in use
@@ -60,7 +66,7 @@ public class HTTPServer {
 
 	/**
 	 * Create and start a http server on the provided address
-	 * 
+	 *
 	 * @param address The port number to use
 	 * @throws IOException   If the address is invalid
 	 * @throws BindException If port is already in use
@@ -71,12 +77,13 @@ public class HTTPServer {
 		this.standardResponseType = StandardResponseType.JSON;
 		this.exceptionMode = DEFAULT_EXCEPTION_MODE;
 		this.httpServer = HttpServer.create(address, 0);
+		this.middlewares = new ArrayList<>();
 		httpServer.start();
 	}
 
 	/**
 	 * Set the {@link ExceptionMode} to use
-	 * 
+	 *
 	 * @param exceptionMode The new {@link ExceptionMode} to use
 	 * @return this {@link HTTPServer} instance so that calls can be chained
 	 */
@@ -106,7 +113,7 @@ public class HTTPServer {
 	/**
 	 * Change the {@link StandardResponseType}. Default is
 	 * {@link StandardResponseType#JSON}
-	 * 
+	 *
 	 * @param standardResponseType The new {@link StandardResponseType} to use
 	 * @return this {@link HTTPServer} instance so that calls can be chained
 	 */
@@ -124,7 +131,7 @@ public class HTTPServer {
 
 	/**
 	 * Stop the web server
-	 * 
+	 *
 	 * @return <code>true</code> on success
 	 */
 	public boolean stop() {
@@ -133,7 +140,7 @@ public class HTTPServer {
 
 	/**
 	 * Stop the web server
-	 * 
+	 *
 	 * @param delay The delay to wait in seconds for connections to close
 	 * @return <code>true</code> on success
 	 */
@@ -153,7 +160,7 @@ public class HTTPServer {
 
 	/**
 	 * Add a {@link HTTPEndpoint} to the web server
-	 * 
+	 *
 	 * @param path     The path of the api endpoint
 	 * @param endpoint The {@link HTTPEndpoint} to add
 	 * @return this {@link HTTPServer} instance so that calls can be chained
@@ -166,7 +173,7 @@ public class HTTPServer {
 	/**
 	 * Create a handler that allows the user to access files on the server. Can be
 	 * used to serve static html content
-	 * 
+	 *
 	 * @param url    The base url
 	 * @param folder The folder to share content from
 	 * @return this {@link HTTPServer} instance so that calls can be chained
@@ -178,7 +185,7 @@ public class HTTPServer {
 	/**
 	 * Create a handler that allows the user to access files on the server. Can be
 	 * used to serve static html content
-	 * 
+	 *
 	 * @param url            The base url
 	 * @param folder         The folder to share content from
 	 * @param directoryIndex The name of the default index file to share
@@ -208,9 +215,27 @@ public class HTTPServer {
 	}
 
 	/**
+	 * @return A {@link List} with all {@link HTTPMiddleware} to use for the request
+	 */
+	public List<HTTPMiddleware> getMiddlewares() {
+		return middlewares;
+	}
+
+	/**
+	 * Add a {@link HTTPMiddleware} for this request
+	 * 
+	 * @param middleware The {@link HTTPMiddleware} to add
+	 * @return this {@link HTTPServer} instance so that calls can be chained
+	 */
+	public HTTPServer addMiddleware(HTTPMiddleware middleware) {
+		middlewares.add(middleware);
+		return this;
+	}
+
+	/**
 	 * The internal {@link com.sun.net.httpserver.HttpHandler} used by the web
 	 * server
-	 * 
+	 *
 	 * @author Zeeraa
 	 */
 	public static class ProxiedHttpHandler implements HttpHandler {
@@ -294,6 +319,22 @@ public class HTTPServer {
 				return standardResponseType.error("Method " + method.name() + " is not allowed for this endpoint", HTTPResponseCode.METHOD_NOT_ALLOWED);
 			}
 
+			// Pre authentication middlewares
+			try {
+				List<HTTPMiddleware> preAuthMiddlewares = new ArrayList<>();
+				preAuthMiddlewares.addAll(server.getMiddlewares().stream().filter(m -> m.getType() == MiddlewareType.PRE_AUTHENTICATION).collect(Collectors.toList()));
+				preAuthMiddlewares.addAll(endpoint.getMiddlewares().stream().filter(m -> m.getType() == MiddlewareType.PRE_AUTHENTICATION).collect(Collectors.toList()));
+				preAuthMiddlewares.sort(new MiddlewarePriority.MiddlewarePrioritySorter());
+				for (HTTPMiddleware middleware : preAuthMiddlewares) {
+					MiddlewareResponse response = middleware.handleRequest(endpoint, request, null);
+					if (response.isCancel()) {
+						return response.getResponse();
+					}
+				}
+			} catch (Exception e) {
+				return generateExceptionResponse(standardResponseType, exceptionMode, e, "An internal error occurred while processing pre authentication middlewares");
+			}
+
 			// Authentication
 			Authentication authentication = null;
 
@@ -325,6 +366,22 @@ public class HTTPServer {
 			AuthenticationResponse authResponse = endpoint.handleAuthentication(authentication, request);
 			if (!authResponse.isSuccess()) {
 				standardResponseType.error(authResponse.getErrorMessage(), authResponse.getCode());
+			}
+
+			// Post authentication middlewares
+			try {
+				List<HTTPMiddleware> postAuthMiddlewares = new ArrayList<>();
+				postAuthMiddlewares.addAll(server.getMiddlewares().stream().filter(m -> m.getType() == MiddlewareType.POST_AUTHENTICATION).collect(Collectors.toList()));
+				postAuthMiddlewares.addAll(endpoint.getMiddlewares().stream().filter(m -> m.getType() == MiddlewareType.POST_AUTHENTICATION).collect(Collectors.toList()));
+				postAuthMiddlewares.sort(new MiddlewarePriority.MiddlewarePrioritySorter());
+				for (HTTPMiddleware middleware : postAuthMiddlewares) {
+					MiddlewareResponse response = middleware.handleRequest(endpoint, request, null);
+					if (response.isCancel()) {
+						return response.getResponse();
+					}
+				}
+			} catch (Exception e) {
+				return generateExceptionResponse(standardResponseType, exceptionMode, e, "An internal error occurred while processing pre authentication middlewares");
 			}
 
 			// Make request

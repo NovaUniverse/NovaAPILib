@@ -9,6 +9,7 @@ import net.novauniverse.apilib.http.body.DefaultBodyParser;
 import net.novauniverse.apilib.http.enums.ExceptionMode;
 import net.novauniverse.apilib.http.enums.HTTPMethod;
 import net.novauniverse.apilib.http.enums.StandardResponseType;
+import net.novauniverse.apilib.http.middleware.HTTPMiddleware;
 import net.novauniverse.apilib.http.request.Request;
 import net.novauniverse.apilib.http.response.AbstractHTTPResponse;
 
@@ -17,7 +18,7 @@ import java.util.List;
 
 /**
  * Represents an api endpoint
- * 
+ *
  * @author Zeeraa
  */
 public abstract class HTTPEndpoint {
@@ -28,6 +29,7 @@ public abstract class HTTPEndpoint {
 	private ExceptionMode exceptionMode;
 	private boolean requireAuthentication;
 	private BodyParser bodyParser;
+	private final List<HTTPMiddleware> middlewares;
 
 	public HTTPEndpoint() {
 		this.allowedMethods = new HTTPMethod[] {};
@@ -37,6 +39,7 @@ public abstract class HTTPEndpoint {
 		this.exceptionMode = ExceptionMode.INHERIT;
 		this.requireAuthentication = false;
 		this.bodyParser = new DefaultBodyParser();
+		this.middlewares = new ArrayList<>();
 	}
 
 	/**
@@ -49,7 +52,7 @@ public abstract class HTTPEndpoint {
 	/**
 	 * Set if this endpoint needs authentication. if <code>true</code> unauthorized
 	 * users will automatically get show an error message
-	 * 
+	 *
 	 * @param requireAuthentication <code>true</code> if this enpoint should require
 	 *                              authentication
 	 */
@@ -68,7 +71,7 @@ public abstract class HTTPEndpoint {
 	/**
 	 * Set the exception mode for this endpoint. By default this is
 	 * {@link ExceptionMode#INHERIT}
-	 * 
+	 *
 	 * @param exceptionMode The new {@link ExceptionMode}
 	 */
 	protected void setExceptionMode(ExceptionMode exceptionMode) {
@@ -87,7 +90,7 @@ public abstract class HTTPEndpoint {
 	 * Set if we should use the {@link AuthenticationProvider}s from
 	 * {@link HTTPServer}. By disabling this you can create individual enpoints
 	 * using their own authentication system
-	 * 
+	 *
 	 * @param useWebServerAuthentication <code>false</code> to disable
 	 *                                   {@link AuthenticationProvider}s from the
 	 *                                   {@link HTTPServer}
@@ -107,7 +110,7 @@ public abstract class HTTPEndpoint {
 	/**
 	 * Change the default {@link StandardResponseType} for this endpoint. Set to
 	 * <code>null</code> to inherit from {@link HTTPServer}
-	 * 
+	 *
 	 * @param standardResponseType The {@link StandardResponseType} to use
 	 */
 	protected void setStandardResponseType(StandardResponseType standardResponseType) {
@@ -123,7 +126,7 @@ public abstract class HTTPEndpoint {
 
 	/**
 	 * Set the allowed {@link HTTPMethod}s for this endpoint
-	 * 
+	 *
 	 * @param allowedMethods Array of {@link HTTPMethod}s to allow
 	 */
 	protected void setAllowedMethods(HTTPMethod... allowedMethods) {
@@ -140,7 +143,7 @@ public abstract class HTTPEndpoint {
 
 	/**
 	 * Add an {@link AuthenticationProvider} to this endpoint
-	 * 
+	 *
 	 * @param provider The {@link AuthenticationProvider} to add
 	 */
 	protected void addAuthenticationProvider(AuthenticationProvider provider) {
@@ -162,8 +165,24 @@ public abstract class HTTPEndpoint {
 	}
 
 	/**
-	 * Set the {@link BodyParser} to use
+	 * Add a {@link HTTPMiddleware} to this endpoint
 	 * 
+	 * @param middleware The {@link HTTPMiddleware} to add
+	 */
+	protected void addMiddleware(HTTPMiddleware middleware) {
+		middlewares.add(middleware);
+	}
+
+	/**
+	 * @return {@link List} with all {@link HTTPMiddleware}s for this endpoint
+	 */
+	public List<HTTPMiddleware> getMiddlewares() {
+		return middlewares;
+	}
+
+	/**
+	 * Set the {@link BodyParser} to use
+	 *
 	 * @param bodyParser The new {@link BodyParser} to use
 	 */
 	protected void setBodyParser(BodyParser bodyParser) {
@@ -172,7 +191,7 @@ public abstract class HTTPEndpoint {
 
 	/**
 	 * Handle a user request
-	 * 
+	 *
 	 * @param request        The {@link Request} object
 	 * @param authentication The {@link Authentication} object or <code>null</code>
 	 *                       if the user is not authenticated
