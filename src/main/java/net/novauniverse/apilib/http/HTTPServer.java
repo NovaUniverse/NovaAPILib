@@ -31,6 +31,7 @@ import java.net.BindException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 public class HTTPServer {
@@ -43,6 +44,7 @@ public class HTTPServer {
 	private StandardResponseType standardResponseType;
 	private ExceptionMode exceptionMode;
 	private List<HTTPMiddleware> middlewares;
+	private List<Consumer<Exception>> exceptionConsumers;
 
 	public List<AuthenticationProvider> getAuthenticationProviders() {
 		return authenticationProviders;
@@ -78,6 +80,7 @@ public class HTTPServer {
 		this.exceptionMode = DEFAULT_EXCEPTION_MODE;
 		this.httpServer = HttpServer.create(address, 0);
 		this.middlewares = new ArrayList<>();
+		this.exceptionConsumers = new ArrayList<>();
 		httpServer.start();
 	}
 
@@ -233,6 +236,26 @@ public class HTTPServer {
 	}
 
 	/**
+	 * Add a {@link Consumer} that will be called if an exception is caught while
+	 * processing a request
+	 * 
+	 * @param consumer The {@link Consumer} of type {@link Exception} to add
+	 * @return this {@link HTTPServer} instance so that calls can be chained
+	 */
+	public HTTPServer addExceptionConsumer(Consumer<Exception> consumer) {
+		exceptionConsumers.add(consumer);
+		return this;
+	}
+
+	/**
+	 * @return {@link List} with {@link Consumer}s that will be called when an
+	 *         exception gets caught while processing a request
+	 */
+	public List<Consumer<Exception>> getExceptionConsumers() {
+		return exceptionConsumers;
+	}
+
+	/**
 	 * The internal {@link com.sun.net.httpserver.HttpHandler} used by the web
 	 * server
 	 *
@@ -288,6 +311,7 @@ public class HTTPServer {
 				try {
 					body = endpoint.getBodyParser().parseBody(exchange);
 				} catch (Exception e) {
+					consumeException(e);
 					return generateExceptionResponse(standardResponseType, exceptionMode, e, "An internal error occurred while processing the request body");
 				}
 			}
@@ -332,6 +356,7 @@ public class HTTPServer {
 					}
 				}
 			} catch (Exception e) {
+				consumeException(e);
 				return generateExceptionResponse(standardResponseType, exceptionMode, e, "An internal error occurred while processing pre authentication middlewares");
 			}
 
@@ -381,6 +406,7 @@ public class HTTPServer {
 					}
 				}
 			} catch (Exception e) {
+				consumeException(e);
 				return generateExceptionResponse(standardResponseType, exceptionMode, e, "An internal error occurred while processing pre authentication middlewares");
 			}
 
@@ -389,8 +415,13 @@ public class HTTPServer {
 				return endpoint.handleRequest(request, authentication);
 			} catch (Exception e) {
 				// Error handling
+				consumeException(e);
 				return generateExceptionResponse(standardResponseType, exceptionMode, e, "An internal error occurred while processing your request");
 			}
+		}
+
+		public void consumeException(Exception exception) {
+			server.getExceptionConsumers().forEach(c -> c.accept(exception));
 		}
 
 		public AbstractHTTPResponse generateExceptionResponse(StandardResponseType standardResponseType, ExceptionMode exceptionMode, Exception exception, String message) {
