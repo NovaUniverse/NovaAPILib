@@ -385,12 +385,12 @@ public class HTTPServer {
 
 			// Validate authentication
 			if (endpoint.isRequireAuthentication() && authentication == null) {
-				standardResponseType.error("Unauthenticated", HTTPResponseCode.UNAUTHORIZED);
+				return standardResponseType.error("Unauthenticated", HTTPResponseCode.UNAUTHORIZED);
 			}
 
 			AuthenticationResponse authResponse = endpoint.handleAuthentication(authentication, request);
 			if (!authResponse.isSuccess()) {
-				standardResponseType.error(authResponse.getErrorMessage(), authResponse.getCode());
+				return standardResponseType.error(authResponse.getErrorMessage(), authResponse.getCode());
 			}
 
 			// Post authentication middlewares
