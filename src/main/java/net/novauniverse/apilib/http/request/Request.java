@@ -60,6 +60,26 @@ public class Request {
 	public Map<String, List<String>> getResponseHeaders() {
 		return HeaderUtilities.headersToMap(exchange.getResponseHeaders());
 	}
+	
+	/**
+	 * Try to get the first header by the provided key
+	 * 
+	 * @param key The key
+	 * @return The header value or null if not found
+	 */
+	public String getFirstRequestHeader(String key) {
+		return exchange.getRequestHeaders().getFirst(key);
+	}
+
+	/**
+	 * Try to get the first header by the provided key
+	 * 
+	 * @param key The key
+	 * @return The header value or null if not found
+	 */
+	public String getFirstResponseHeader(String key) {
+		return exchange.getResponseHeaders().getFirst(key);
+	}
 
 	public Request setResponseHeader(String key, String value) {
 		exchange.getResponseHeaders().add(key, value);
