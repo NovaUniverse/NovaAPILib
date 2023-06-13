@@ -16,7 +16,29 @@ and the following to the `<dependencies>` section
 <dependency>
 	<groupId>net.novauniverse</groupId>
 	<artifactId>NovaAPILib</artifactId>
-	<version>1.1.2-SNAPSHOT</version>
+	<version>1.2.0-SNAPSHOT</version>
+	<scope>compile</scope>
+</dependency>
+```
+
+If your project does not already include `org.json` and `commons-io` make sure to add them like shown below.
+
+org.json
+```xml
+<dependency>
+	<groupId>org.json</groupId>
+	<artifactId>json</artifactId>
+	<version>20230227</version>
+	<scope>compile</scope>
+</dependency>
+```
+
+commons-io
+```xml
+<dependency>
+	<groupId>commons-io</groupId>
+	<artifactId>commons-io</artifactId>
+	<version>2.11.0</version>
 	<scope>compile</scope>
 </dependency>
 ```
