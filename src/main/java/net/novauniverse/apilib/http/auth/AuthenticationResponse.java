@@ -30,7 +30,7 @@ public class AuthenticationResponse {
 	public static final AuthenticationResponse FORBIDDEN = new AuthenticationResponse(true, "Forbidden", 403);
 
 	/**
-	 * Cenerates a custom error with its own message and http response code
+	 * Generates a custom error with its own message and http response code
 	 * 
 	 * @param errorMessage The error message
 	 * @param code         The http response code
@@ -41,7 +41,7 @@ public class AuthenticationResponse {
 	}
 	
 	/**
-	 * Cenerates a custom error with its own message and http response code
+	 * Generates a custom error with its own message and http response code
 	 * 
 	 * @param errorMessage The error message
 	 * @param code         The {@link HTTPResponseCode}
