@@ -1,5 +1,7 @@
 package net.novauniverse.apilib.http.auth;
 
+import net.novauniverse.apilib.http.enums.HTTPResponseCode;
+
 /**
  * This represents the response when validation an authentication
  * 
@@ -36,6 +38,17 @@ public class AuthenticationResponse {
 	 */
 	public static AuthenticationResponse customFailResponse(String errorMessage, int code) {
 		return new AuthenticationResponse(false, errorMessage, code);
+	}
+	
+	/**
+	 * Cenerates a custom error with its own message and http response code
+	 * 
+	 * @param errorMessage The error message
+	 * @param code         The {@link HTTPResponseCode}
+	 * @return the custom {@link AuthenticationResponse} object
+	 */
+	public static AuthenticationResponse customFailResponse(String errorMessage, HTTPResponseCode code) {
+		return customFailResponse(errorMessage, code.getCode());
 	}
 
 	private AuthenticationResponse(boolean success, String errorMessage, int code) {
