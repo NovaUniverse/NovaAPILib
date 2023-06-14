@@ -291,132 +291,143 @@ public class HTTPServer {
 		}
 
 		public AbstractHTTPResponse processRequest(HttpExchange exchange) {
-			// Get default response type
-			StandardResponseType standardResponseType = server.getStandardResponseType();
-			if (endpoint.getStandardResponseType() != null) {
-				standardResponseType = endpoint.getStandardResponseType();
-			}
-
-			// Get exception mode
-			ExceptionMode exceptionMode = server.getExceptionMode();
-			if (endpoint.getExceptionMode() != null) {
-				if (endpoint.getExceptionMode() != ExceptionMode.INHERIT) {
-					exceptionMode = endpoint.getExceptionMode();
+			try {
+				// Get default response type
+				StandardResponseType standardResponseType = server.getStandardResponseType();
+				if (endpoint.getStandardResponseType() != null) {
+					standardResponseType = endpoint.getStandardResponseType();
 				}
-			}
 
-			// Request body
-			String body = null;
-			if (endpoint.getBodyParser() != null) {
+				// Get exception mode
+				ExceptionMode exceptionMode = server.getExceptionMode();
+				if (endpoint.getExceptionMode() != null) {
+					if (endpoint.getExceptionMode() != ExceptionMode.INHERIT) {
+						exceptionMode = endpoint.getExceptionMode();
+					}
+				}
+
+				// Request body
+				String body = null;
+				if (endpoint.getBodyParser() != null) {
+					try {
+						body = endpoint.getBodyParser().parseBody(exchange);
+					} catch (Exception e) {
+						consumeException(e);
+						return generateExceptionResponse(standardResponseType, exceptionMode, e, "An internal error occurred while processing the request body");
+					}
+				}
+
+				// Setup request object
+				Request request;
 				try {
-					body = endpoint.getBodyParser().parseBody(exchange);
+					request = new Request(server, exchange, body);
+				} catch (HTTPMethodNotSupportedException e) {
+					return standardResponseType.error(e.getMessage(), HTTPResponseCode.METHOD_NOT_ALLOWED);
+				}
+
+				// Allowed method validation
+				HTTPMethod method = request.getMethod();
+
+				boolean methodAllowed = false;
+				if (endpoint.getAllowedMethods().length == 0) {
+					methodAllowed = true;
+				} else {
+					for (HTTPMethod allowed : endpoint.getAllowedMethods()) {
+						if (method == allowed) {
+							methodAllowed = true;
+							break;
+						}
+					}
+				}
+
+				if (!methodAllowed) {
+					return standardResponseType.error("Method " + method.name() + " is not allowed for this endpoint", HTTPResponseCode.METHOD_NOT_ALLOWED);
+				}
+
+				// Pre authentication middlewares
+				try {
+					List<HTTPMiddleware> preAuthMiddlewares = new ArrayList<>();
+					preAuthMiddlewares.addAll(server.getMiddlewares().stream().filter(m -> m.getType() == MiddlewareType.PRE_AUTHENTICATION).collect(Collectors.toList()));
+					preAuthMiddlewares.addAll(endpoint.getMiddlewares().stream().filter(m -> m.getType() == MiddlewareType.PRE_AUTHENTICATION).collect(Collectors.toList()));
+					preAuthMiddlewares.sort(new MiddlewarePriority.MiddlewarePrioritySorter());
+					for (HTTPMiddleware middleware : preAuthMiddlewares) {
+						MiddlewareResponse response = middleware.handleRequest(endpoint, request, null);
+						if (response.isCancel()) {
+							return response.getResponse();
+						}
+					}
 				} catch (Exception e) {
 					consumeException(e);
-					return generateExceptionResponse(standardResponseType, exceptionMode, e, "An internal error occurred while processing the request body");
+					return generateExceptionResponse(standardResponseType, exceptionMode, e, "An internal error occurred while processing pre authentication middlewares");
 				}
-			}
 
-			// Setup request object
-			Request request;
-			try {
-				request = new Request(server, exchange, body);
-			} catch (HTTPMethodNotSupportedException e) {
-				return standardResponseType.error(e.getMessage(), HTTPResponseCode.METHOD_NOT_ALLOWED);
-			}
+				// Authentication
+				Authentication authentication = null;
 
-			// Allowed method validation
-			HTTPMethod method = request.getMethod();
-
-			boolean methodAllowed = false;
-			if (endpoint.getAllowedMethods().length == 0) {
-				methodAllowed = true;
-			} else {
-				for (HTTPMethod allowed : endpoint.getAllowedMethods()) {
-					if (method == allowed) {
-						methodAllowed = true;
-						break;
-					}
-				}
-			}
-
-			if (!methodAllowed) {
-				return standardResponseType.error("Method " + method.name() + " is not allowed for this endpoint", HTTPResponseCode.METHOD_NOT_ALLOWED);
-			}
-
-			// Pre authentication middlewares
-			try {
-				List<HTTPMiddleware> preAuthMiddlewares = new ArrayList<>();
-				preAuthMiddlewares.addAll(server.getMiddlewares().stream().filter(m -> m.getType() == MiddlewareType.PRE_AUTHENTICATION).collect(Collectors.toList()));
-				preAuthMiddlewares.addAll(endpoint.getMiddlewares().stream().filter(m -> m.getType() == MiddlewareType.PRE_AUTHENTICATION).collect(Collectors.toList()));
-				preAuthMiddlewares.sort(new MiddlewarePriority.MiddlewarePrioritySorter());
-				for (HTTPMiddleware middleware : preAuthMiddlewares) {
-					MiddlewareResponse response = middleware.handleRequest(endpoint, request, null);
-					if (response.isCancel()) {
-						return response.getResponse();
-					}
-				}
-			} catch (Exception e) {
-				consumeException(e);
-				return generateExceptionResponse(standardResponseType, exceptionMode, e, "An internal error occurred while processing pre authentication middlewares");
-			}
-
-			// Authentication
-			Authentication authentication = null;
-
-			// Try with endpoint specific first
-			for (AuthenticationProvider provider : endpoint.getAuthenticationProviders()) {
-				authentication = provider.authenticate(request);
-				if (authentication != null) {
-					break;
-				}
-			}
-
-			// Then with the ones from HTTPServer
-			if (endpoint.isUseWebServerAuthentication()) {
-				if (authentication == null) {
-					for (AuthenticationProvider provider : server.getAuthenticationProviders()) {
+				try {
+					// Try with endpoint specific first
+					for (AuthenticationProvider provider : endpoint.getAuthenticationProviders()) {
 						authentication = provider.authenticate(request);
 						if (authentication != null) {
 							break;
 						}
 					}
+				} catch (Exception e) {
+					consumeException(e);
+					return generateExceptionResponse(standardResponseType, exceptionMode, e, "An internal error occurred while processing authentication");
 				}
-			}
 
-			// Validate authentication
-			if (endpoint.isRequireAuthentication() && authentication == null) {
-				return standardResponseType.error("Unauthenticated", HTTPResponseCode.UNAUTHORIZED);
-			}
-
-			AuthenticationResponse authResponse = endpoint.handleAuthentication(authentication, request);
-			if (!authResponse.isSuccess()) {
-				return standardResponseType.error(authResponse.getErrorMessage(), authResponse.getCode());
-			}
-
-			// Post authentication middlewares
-			try {
-				List<HTTPMiddleware> postAuthMiddlewares = new ArrayList<>();
-				postAuthMiddlewares.addAll(server.getMiddlewares().stream().filter(m -> m.getType() == MiddlewareType.POST_AUTHENTICATION).collect(Collectors.toList()));
-				postAuthMiddlewares.addAll(endpoint.getMiddlewares().stream().filter(m -> m.getType() == MiddlewareType.POST_AUTHENTICATION).collect(Collectors.toList()));
-				postAuthMiddlewares.sort(new MiddlewarePriority.MiddlewarePrioritySorter());
-				for (HTTPMiddleware middleware : postAuthMiddlewares) {
-					MiddlewareResponse response = middleware.handleRequest(endpoint, request, null);
-					if (response.isCancel()) {
-						return response.getResponse();
+				// Then with the ones from HTTPServer
+				if (endpoint.isUseWebServerAuthentication()) {
+					if (authentication == null) {
+						for (AuthenticationProvider provider : server.getAuthenticationProviders()) {
+							authentication = provider.authenticate(request);
+							if (authentication != null) {
+								break;
+							}
+						}
 					}
 				}
-			} catch (Exception e) {
-				consumeException(e);
-				return generateExceptionResponse(standardResponseType, exceptionMode, e, "An internal error occurred while processing pre authentication middlewares");
-			}
 
-			// Make request
-			try {
-				return endpoint.handleRequest(request, authentication);
+				// Validate authentication
+				if (endpoint.isRequireAuthentication() && authentication == null) {
+					return standardResponseType.error("Unauthenticated", HTTPResponseCode.UNAUTHORIZED);
+				}
+
+				AuthenticationResponse authResponse = endpoint.handleAuthentication(authentication, request);
+				if (!authResponse.isSuccess()) {
+					return standardResponseType.error(authResponse.getErrorMessage(), authResponse.getCode());
+				}
+
+				// Post authentication middlewares
+				try {
+					List<HTTPMiddleware> postAuthMiddlewares = new ArrayList<>();
+					postAuthMiddlewares.addAll(server.getMiddlewares().stream().filter(m -> m.getType() == MiddlewareType.POST_AUTHENTICATION).collect(Collectors.toList()));
+					postAuthMiddlewares.addAll(endpoint.getMiddlewares().stream().filter(m -> m.getType() == MiddlewareType.POST_AUTHENTICATION).collect(Collectors.toList()));
+					postAuthMiddlewares.sort(new MiddlewarePriority.MiddlewarePrioritySorter());
+					for (HTTPMiddleware middleware : postAuthMiddlewares) {
+						MiddlewareResponse response = middleware.handleRequest(endpoint, request, null);
+						if (response.isCancel()) {
+							return response.getResponse();
+						}
+					}
+				} catch (Exception e) {
+					consumeException(e);
+					return generateExceptionResponse(standardResponseType, exceptionMode, e, "An internal error occurred while processing pre authentication middlewares");
+				}
+
+				// Make request
+				try {
+					return endpoint.handleRequest(request, authentication);
+				} catch (Exception e) {
+					// Error handling
+					consumeException(e);
+					return generateExceptionResponse(standardResponseType, exceptionMode, e, "An internal error occurred while processing your request");
+				}
 			} catch (Exception e) {
-				// Error handling
-				consumeException(e);
-				return generateExceptionResponse(standardResponseType, exceptionMode, e, "An internal error occurred while processing your request");
+				e.printStackTrace();
+				System.err.println("Unhandled exception in ProxiedHttpHandler");
+				return new TextResponse("Unhandled exception in ProxiedHttpHandler", HTTPResponseCode.INTERNAL_SERVER_ERROR);
 			}
 		}
 
