@@ -48,6 +48,9 @@ public abstract class HTTPMiddleware {
 		this.priority = priority;
 	}
 
+	public void handleOptionsRequest(Request request) {
+	}
+
 	/**
 	 * Set the new type
 	 * 

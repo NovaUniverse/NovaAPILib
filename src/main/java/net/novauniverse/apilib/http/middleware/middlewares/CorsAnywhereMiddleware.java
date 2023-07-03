@@ -28,4 +28,9 @@ public class CorsAnywhereMiddleware extends HTTPMiddleware {
 		request.setResponseHeader("Access-Control-Allow-Origin", "*");
 		return MiddlewareResponse.CONTINUE;
 	}
+
+	@Override
+	public void handleOptionsRequest(Request request) {
+		request.setResponseHeader("Access-Control-Allow-Origin", "*");
+	}
 }
