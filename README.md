@@ -16,7 +16,7 @@ and the following to the `<dependencies>` section
 <dependency>
 	<groupId>net.novauniverse</groupId>
 	<artifactId>NovaAPILib</artifactId>
-	<version>1.2.3-SNAPSHOT</version>
+	<version>1.2.4-SNAPSHOT</version>
 	<scope>compile</scope>
 </dependency>
 ```
