@@ -11,7 +11,7 @@ import java.nio.charset.StandardCharsets;
 
 /**
  * A response containing a {@link JSONObject} or {@link JSONArray}
- * 
+ *
  * @author Zeeraa
  */
 public class JSONResponse extends AbstractHTTPResponse {
@@ -21,9 +21,27 @@ public class JSONResponse extends AbstractHTTPResponse {
 
 	/* ---- JSONObject ---- */
 	/**
+	 * Sends an empty {@link JSONObject} with the default repose code of
+	 * {@link HTTPResponseCode#OK} and no indentation
+	 */
+	public JSONResponse() {
+		this(new JSONObject(), HTTPResponseCode.OK, 0);
+	}
+
+	/**
+	 * Sends an empty {@link JSONObject} with the provided response code and no indentation
+	 *
+	 * @param code        The {@link HTTPResponseCode}
+	 */
+	public JSONResponse(HTTPResponseCode code) {
+		this(new JSONObject(), code, 0);
+	}
+
+
+	/**
 	 * Sends a {@link JSONObject} with the default repose code of
 	 * {@link HTTPResponseCode#OK} and no indentation
-	 * 
+	 *
 	 * @param json The {@link JSONObject} to send
 	 */
 	public JSONResponse(JSONObject json) {
@@ -32,7 +50,7 @@ public class JSONResponse extends AbstractHTTPResponse {
 
 	/**
 	 * Sends a {@link JSONObject} with the provided response code and no indentation
-	 * 
+	 *
 	 * @param json The {@link JSONObject} to send
 	 * @param code The {@link HTTPResponseCode}
 	 */
@@ -42,7 +60,7 @@ public class JSONResponse extends AbstractHTTPResponse {
 
 	/**
 	 * Sends a {@link JSONObject} with the provided response code and indentation
-	 * 
+	 *
 	 * @param json        The {@link JSONObject} to send
 	 * @param code        The {@link HTTPResponseCode}
 	 * @param indentation The indentation to use
@@ -53,7 +71,7 @@ public class JSONResponse extends AbstractHTTPResponse {
 
 	/**
 	 * Sends a {@link JSONObject} with the provided response code and no indentation
-	 * 
+	 *
 	 * @param json The {@link JSONObject} to send
 	 * @param code The http response code
 	 */
@@ -63,7 +81,7 @@ public class JSONResponse extends AbstractHTTPResponse {
 
 	/**
 	 * Sends a {@link JSONObject} with the provided response code and indentation
-	 * 
+	 *
 	 * @param json        The {@link JSONObject} to send
 	 * @param code        The http response code
 	 * @param indentation The indentation to use
@@ -76,7 +94,7 @@ public class JSONResponse extends AbstractHTTPResponse {
 	/**
 	 * Sends a {@link JSONArray} with the default repose code of
 	 * {@link HTTPResponseCode#OK} and no indentation
-	 * 
+	 *
 	 * @param json The {@link JSONArray} to send
 	 */
 	public JSONResponse(JSONArray json) {
@@ -85,7 +103,7 @@ public class JSONResponse extends AbstractHTTPResponse {
 
 	/**
 	 * Sends a {@link JSONArray} with the provided response code and no indentation
-	 * 
+	 *
 	 * @param json The {@link JSONArray} to send
 	 * @param code The {@link HTTPResponseCode}
 	 */
@@ -95,7 +113,7 @@ public class JSONResponse extends AbstractHTTPResponse {
 
 	/**
 	 * Sends a {@link JSONArray} with the provided response code and indentation
-	 * 
+	 *
 	 * @param json        The {@link JSONArray} to send
 	 * @param code        The {@link HTTPResponseCode}
 	 * @param indentation The indentation to use
@@ -106,7 +124,7 @@ public class JSONResponse extends AbstractHTTPResponse {
 
 	/**
 	 * Sends a {@link JSONArray} with the provided response code and no indentation
-	 * 
+	 *
 	 * @param json The {@link JSONArray} to send
 	 * @param code The http response code
 	 */
@@ -116,7 +134,7 @@ public class JSONResponse extends AbstractHTTPResponse {
 
 	/**
 	 * Sends a {@link JSONArray} with the provided response code and indentation
-	 * 
+	 *
 	 * @param json        The {@link JSONArray} to send
 	 * @param code        The http response code
 	 * @param indentation The indentation to use
